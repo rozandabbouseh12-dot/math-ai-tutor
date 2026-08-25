@@ -61,7 +61,7 @@ if prompt := st.chat_input("Type your algebra problem, step, or question here...
     with st.chat_message("user"):
         st.write(prompt)
 
-    # Use last 4 messages to save tokens and avoid quota spikes
+    # Use last 4 messages to optimize context
     recent_messages = st.session_state.messages[-4:]
     contents_payload = []
     for m in recent_messages:
@@ -75,8 +75,9 @@ if prompt := st.chat_input("Type your algebra problem, step, or question here...
         message_placeholder = st.empty()
         message_placeholder.markdown("⏳ *Thinking...*")
         
-        # Calling the active endpoint directly
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        # Using the exact recommended model: gemini-3.6-flash
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+        
         payload = {
             "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": contents_payload,
