@@ -1,80 +1,80 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
 
-# Page Configuration
-st.set_page_config(page_title="AI Math Tutor - Stage 7", page_icon="📐", layout="centered")
+# 1. Page Configuration
+st.set_page_config(page_title="Cambridge Stage 7 AI Math Coach", page_icon="📐", layout="centered")
 
 st.title("📐 Cambridge Stage 7 AI Math Coach")
 st.caption("Adaptive Learning Environment - Algebra: Expressions and Equations")
 
-# Retrieve API Key from Secrets
-api_key = st.secrets.get("GEMINI_API_KEY")
+# 2. Retrieve and sanitize API Key
+api_key = st.secrets.get("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
 
 if not api_key:
-    st.error("⚠️ Please add your GEMINI_API_KEY in the app Secrets settings!")
+    st.error("⚠️ GEMINI_API_KEY is missing in Streamlit Settings > Secrets!")
     st.stop()
 
-# Configure the API directly
-genai.configure(api_key=api_key)
-
+# 3. System Prompt (Option 2: Hint first -> Full solution on demand)
 SYSTEM_PROMPT = """
-You are an expert Cambridge Stage 7 Mathematics Socratic Tutor specializing in Algebra (Expressions and Equations).
+You are an expert Cambridge Stage 7 Mathematics Tutor specializing in Algebra (Expressions and Equations).
 
-ABSOLUTE RESTRICTIONS (ZERO TOLERANCE):
-1. NEVER output any algebraic calculation, intermediate step, or final solution.
-2. NEVER write equations that solve the problem for the student (e.g., do NOT write "2x = 10 - 7" or "2x = 3").
-3. DO NOT solve the problem directly under any circumstances, even if the student asks or demands the answer.
-
-YOUR ONLY ROLE:
-- Always respond in clear, grammatically correct ENGLISH.
-- Ask ONE guiding, Socratic question to prompt the student to think of the next move.
-- Keep your response under 2 sentences.
-- Guide step-by-step through: collecting like terms, expanding brackets, applying inverse operations, and maintaining equation balance.
-
-BEHAVIOR EXAMPLES:
-- Student: "Solve 2x + 7 = 10"
-  Tutor: "Great problem! To isolate the 2x term, what inverse operation should we apply to both sides to remove +7?"
-- Student: "Subtract 7"
-  Tutor: "Spot on! If you subtract 7 from both sides, what does the equation look like now?"
-- Student: "Give me the answer"
-  Tutor: "I am here to help you master it yourself! What is the very first step you think we should try?"
+CORE BEHAVIOR RULES:
+1. PHASE 1 (GUIDANCE FIRST): When a student gives an algebra problem or step, guide them first with ONE clear hint or Socratic question to prompt their thinking. Keep responses short (under 2 sentences).
+2. PHASE 2 (SCAFFOLDING & REVEALING):
+   - If the student explicitly asks for the answer or says "I don't know" / "give me the solution" / "show me the steps":
+     Provide the clear, step-by-step algebraic solution with the final answer clearly stated, explained at the Cambridge Stage 7 level.
+   - If the student makes repeated mistakes: provide a bigger hint, and if they still struggle, show them the next step directly to unblock them.
+   - If the student solves it correctly: Validate enthusiastically and confirm the final answer!
+3. Always respond in clear, simple English.
 """
 
-# Initialize Gemini Model
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    system_instruction=SYSTEM_PROMPT
-)
-
-# Initialize Chat History
+# 4. Initialize Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Welcome! I am your Cambridge Stage 7 Math AI Coach. Type your algebra problem, and we will work through it step by step!"}
+        {"role": "assistant", "content": "Hello! I am your Cambridge Stage 7 Math Coach. What algebra problem are we working on today?"}
     ]
 
-# Display Chat History
+# 5. Display existing conversation
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# User Input Box
-if prompt := st.chat_input("Type your algebra problem or next step here..."):
+# 6. User Input & API Request Handling
+if prompt := st.chat_input("Type your algebra problem or question here..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
 
-    # Convert chat history for the API
-    history = []
-    for m in st.session_state.messages[:-1]:
+    # Format history payload for Gemini REST endpoint
+    contents_payload = []
+    for m in st.session_state.messages:
         role = "model" if m["role"] == "assistant" else "user"
-        history.append({"role": role, "parts": [m["content"]]})
+        contents_payload.append({
+            "role": role,
+            "parts": [{"text": str(m["content"])}]
+        })
 
     with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        message_placeholder.markdown("⏳ *Thinking...*")
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        payload = {
+            "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            "contents": contents_payload,
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 300}
+        }
+
         try:
-            chat = model.start_chat(history=history)
-            response = chat.send_message(prompt)
-            bot_reply = response.text.strip()
-            st.write(bot_reply)
-            st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-        except Exception as e:
-            st.error(f"Connection error: {e}")
+            res = requests.post(url, json=payload, timeout=15)
+            data = res.json()
+            
+            if res.status_code == 200 and "candidates" in data:
+                reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                message_placeholder.markdown(reply)
+                st.session_state.messages.append({"role": "assistant", "content": reply})
+            else:
+                err = data.get("error", {}).get("message", "API request failed.")
+                message_placeholder.error(f"Error: {err}")
+        except Exception as ex:
+            message_placeholder.error(f"Request timeout or network issue: {ex}")
