@@ -1,8 +1,7 @@
 import streamlit as st
 import requests
-import time
 
-# 1. Page Configuration
+# 1. Page Config
 st.set_page_config(
     page_title="Cambridge Stage 7 AI Math Coach",
     page_icon="📐",
@@ -12,7 +11,7 @@ st.set_page_config(
 st.title("📐 Cambridge Stage 7 AI Math Coach")
 st.caption("Adaptive Learning Environment - Algebra: Expressions and Equations")
 
-# Sidebar for controls
+# Controls
 with st.sidebar:
     st.header("⚙️ Controls")
     if st.button("🔄 Start New Problem / Clear Chat"):
@@ -21,14 +20,14 @@ with st.sidebar:
         ]
         st.rerun()
 
-# 2. Retrieve API Key securely
+# 2. Get API Key
 api_key = st.secrets.get("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
 
 if not api_key:
     st.error("⚠️ GEMINI_API_KEY is missing in Streamlit Settings > Secrets!")
     st.stop()
 
-# 3. Enhanced Socratic & Pedagogical Prompt
+# 3. System Prompt
 SYSTEM_PROMPT = """
 You are an expert Cambridge Stage 7 Mathematics Tutor specializing in Algebra (Expressions and Equations).
 
@@ -46,24 +45,24 @@ CORE BEHAVIOR RULES:
 3. Keep explanations clear, supportive, and perfectly aligned with Cambridge Stage 7 standards.
 """
 
-# 4. Initialize Continuous Chat History
+# 4. History
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Hello! I am your Cambridge Stage 7 Math Coach. What algebra problem are we working on today?"}
     ]
 
-# 5. Render All Historical Messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# 6. User Input & Request Handling
+# 5. User Input
 if prompt := st.chat_input("Type your algebra problem, step, or question here..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
 
-    recent_messages = st.session_state.messages[-10:]
+    # Use last 4 messages to save tokens and avoid quota spikes
+    recent_messages = st.session_state.messages[-4:]
     contents_payload = []
     for m in recent_messages:
         role = "model" if m["role"] == "assistant" else "user"
@@ -76,42 +75,27 @@ if prompt := st.chat_input("Type your algebra problem, step, or question here...
         message_placeholder = st.empty()
         message_placeholder.markdown("⏳ *Thinking...*")
         
-        # Endpoint strictly set to gemini-3.6-flash
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+        # Calling the active endpoint directly
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
         payload = {
             "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": contents_payload,
             "generationConfig": {
                 "temperature": 0.2,
-                "maxOutputTokens": 2048
+                "maxOutputTokens": 800
             }
         }
 
-        # Auto-retry logic for quota/rate limits
-        max_retries = 3
-        success = False
-        
-        for attempt in range(max_retries):
-            try:
-                res = requests.post(url, json=payload, timeout=30)
-                data = res.json()
-                
-                if res.status_code == 200 and "candidates" in data:
-                    reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    message_placeholder.markdown(reply)
-                    st.session_state.messages.append({"role": "assistant", "content": reply})
-                    success = True
-                    break
-                elif res.status_code == 429:
-                    message_placeholder.markdown("⏳ *Server busy, retrying in 5 seconds...*")
-                    time.sleep(5)
-                else:
-                    err = data.get("error", {}).get("message", "API request failed.")
-                    message_placeholder.error(f"Error: {err}")
-                    break
-            except Exception as ex:
-                message_placeholder.error(f"Connection issue: {ex}")
-                break
-        
-        if not success and res.status_code == 429:
-            message_placeholder.warning("⚠️ High server load. Please wait 10 seconds and try again.")
+        try:
+            res = requests.post(url, json=payload, timeout=25)
+            data = res.json()
+            
+            if res.status_code == 200 and "candidates" in data:
+                reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                message_placeholder.markdown(reply)
+                st.session_state.messages.append({"role": "assistant", "content": reply})
+            else:
+                err_msg = data.get("error", {}).get("message", f"HTTP Error {res.status_code}")
+                message_placeholder.error(f"⚠️ Google API Message: {err_msg}")
+        except Exception as e:
+            message_placeholder.error(f"⚠️ Connection Error: {e}")
