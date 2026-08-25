@@ -2,52 +2,71 @@ import streamlit as st
 import requests
 
 # 1. Page Configuration
-st.set_page_config(page_title="Cambridge Stage 7 AI Math Coach", page_icon="📐", layout="centered")
+st.set_page_config(
+    page_title="Cambridge Stage 7 AI Math Coach",
+    page_icon="📐",
+    layout="centered"
+)
 
 st.title("📐 Cambridge Stage 7 AI Math Coach")
 st.caption("Adaptive Learning Environment - Algebra: Expressions and Equations")
 
-# 2. Retrieve and sanitize API Key
+# Sidebar for controls
+with st.sidebar:
+    st.header("⚙️ Controls")
+    if st.button("🔄 Start New Problem / Clear Chat"):
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Hello! I am your Cambridge Stage 7 Math Coach. What algebra problem are we working on today?"}
+        ]
+        st.rerun()
+
+# 2. Retrieve API Key securely
 api_key = st.secrets.get("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
 
 if not api_key:
     st.error("⚠️ GEMINI_API_KEY is missing in Streamlit Settings > Secrets!")
     st.stop()
 
-# 3. System Prompt (Option 2: Hint first -> Full solution on demand)
+# 3. Enhanced Socratic & Pedagogical Prompt
 SYSTEM_PROMPT = """
 You are an expert Cambridge Stage 7 Mathematics Tutor specializing in Algebra (Expressions and Equations).
 
 CORE BEHAVIOR RULES:
-1. PHASE 1 (GUIDANCE FIRST): When a student gives an algebra problem or step, guide them first with ONE clear hint or Socratic question to prompt their thinking. Keep responses short (under 2 sentences).
-2. PHASE 2 (SCAFFOLDING & REVEALING):
-   - If the student explicitly asks for the answer or says "I don't know" / "give me the solution" / "show me the steps":
-     Provide the clear, step-by-step algebraic solution with the final answer clearly stated, explained at the Cambridge Stage 7 level.
-   - If the student makes repeated mistakes: provide a bigger hint, and if they still struggle, show them the next step directly to unblock them.
-   - If the student solves it correctly: Validate enthusiastically and confirm the final answer!
-3. Always respond in clear, simple English.
+1. PHASE 1 (GUIDED INQUIRY):
+   - When a student presents a problem or partial step, guide them with ONE clear, encouraging hint or Socratic question.
+   - Prompt them to identify: inverse operations, balancing both sides, collecting like terms, or expanding brackets.
+   - Use clean, standard text formatting for math (e.g., 2x + 5 = 15). Avoid awkward symbols.
+
+2. PHASE 2 (SCAFFOLDED SOLUTION):
+   - If the student explicitly asks for the answer ("give me the steps", "I don't know", "show solution") or gets stuck repeatedly:
+     Provide a clear, complete, step-by-step algebraic explanation with the final answer stated plainly.
+   - If the student solves correctly: Validate enthusiastically and confirm the final answer!
+
+3. Keep explanations clear, supportive, and perfectly aligned with Cambridge Stage 7 standards.
 """
 
-# 4. Initialize Chat History
+# 4. Initialize Continuous Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Hello! I am your Cambridge Stage 7 Math Coach. What algebra problem are we working on today?"}
     ]
 
-# 5. Display existing conversation
+# 5. Render All Historical Messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# 6. User Input & API Request Handling
-if prompt := st.chat_input("Type your algebra problem or question here..."):
+# 6. User Input & Endless Conversation Loop
+if prompt := st.chat_input("Type your algebra problem, step, or question here..."):
+    # Append & display student input
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
 
-    # Format history payload for Gemini REST endpoint
+    # Sliding context window: send last 20 turns to guarantee unlimited chatting without hitting memory caps
+    recent_messages = st.session_state.messages[-20:]
     contents_payload = []
-    for m in st.session_state.messages:
+    for m in recent_messages:
         role = "model" if m["role"] == "assistant" else "user"
         contents_payload.append({
             "role": role,
@@ -58,16 +77,18 @@ if prompt := st.chat_input("Type your algebra problem or question here..."):
         message_placeholder = st.empty()
         message_placeholder.markdown("⏳ *Thinking...*")
         
-        # Updated model endpoint to gemini-3.6-flash
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
         payload = {
             "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": contents_payload,
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 300}
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 8192
+            }
         }
 
         try:
-            res = requests.post(url, json=payload, timeout=15)
+            res = requests.post(url, json=payload, timeout=30)
             data = res.json()
             
             if res.status_code == 200 and "candidates" in data:
