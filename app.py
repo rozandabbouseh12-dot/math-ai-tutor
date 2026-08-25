@@ -1,6 +1,5 @@
 import streamlit as st
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 # Page Configuration
 st.set_page_config(page_title="AI Math Tutor - Stage 7", page_icon="📐", layout="centered")
@@ -15,8 +14,8 @@ if not api_key:
     st.error("⚠️ Please add your GEMINI_API_KEY in the app Secrets settings!")
     st.stop()
 
-# Initialize Gemini Client
-client = genai.Client(api_key=api_key)
+# Configure the API directly
+genai.configure(api_key=api_key)
 
 SYSTEM_PROMPT = """
 You are an expert Cambridge Stage 7 Mathematics Socratic Tutor specializing in Algebra (Expressions and Equations).
@@ -41,13 +40,19 @@ BEHAVIOR EXAMPLES:
   Tutor: "I am here to help you master it yourself! What is the very first step you think we should try?"
 """
 
+# Initialize Gemini Model
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    system_instruction=SYSTEM_PROMPT
+)
+
 # Initialize Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Welcome! I am your Cambridge Stage 7 Math AI Coach. Type your algebra problem, and we will work through it step by step!"}
     ]
 
-# Display Existing Chat Messages
+# Display Chat History
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
@@ -58,27 +63,16 @@ if prompt := st.chat_input("Type your algebra problem or next step here..."):
     with st.chat_message("user"):
         st.write(prompt)
 
-    # Format message history safely for Gemini SDK
-    formatted_contents = []
-    for m in st.session_state.messages:
+    # Convert chat history for the API
+    history = []
+    for m in st.session_state.messages[:-1]:
         role = "model" if m["role"] == "assistant" else "user"
-        formatted_contents.append(
-            types.Content(
-                role=role,
-                parts=[types.Part.from_text(text=m["content"])]
-            )
-        )
+        history.append({"role": role, "parts": [m["content"]]})
 
     with st.chat_message("assistant"):
         try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=formatted_contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
-                    temperature=0.3
-                )
-            )
+            chat = model.start_chat(history=history)
+            response = chat.send_message(prompt)
             bot_reply = response.text.strip()
             st.write(bot_reply)
             st.session_state.messages.append({"role": "assistant", "content": bot_reply})
