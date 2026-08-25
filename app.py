@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import time
 
 # 1. Page Configuration
 st.set_page_config(
@@ -62,8 +63,7 @@ if prompt := st.chat_input("Type your algebra problem, step, or question here...
     with st.chat_message("user"):
         st.write(prompt)
 
-    # Sliding context window: send last 20 turns
-    recent_messages = st.session_state.messages[-20:]
+    recent_messages = st.session_state.messages[-10:]
     contents_payload = []
     for m in recent_messages:
         role = "model" if m["role"] == "assistant" else "user"
@@ -76,27 +76,42 @@ if prompt := st.chat_input("Type your algebra problem, step, or question here...
         message_placeholder = st.empty()
         message_placeholder.markdown("⏳ *Thinking...*")
         
-        # Updated to gemini-3.6-flash
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+        # Standard verified model endpoint
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
         payload = {
             "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": contents_payload,
             "generationConfig": {
                 "temperature": 0.2,
-                "maxOutputTokens": 8192
+                "maxOutputTokens": 2048
             }
         }
 
-        try:
-            res = requests.post(url, json=payload, timeout=30)
-            data = res.json()
-            
-            if res.status_code == 200 and "candidates" in data:
-                reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                message_placeholder.markdown(reply)
-                st.session_state.messages.append({"role": "assistant", "content": reply})
-            else:
-                err = data.get("error", {}).get("message", "API request failed.")
-                message_placeholder.error(f"Error: {err}")
-        except Exception as ex:
-            message_placeholder.error(f"Request timeout or network issue: {ex}")
+        # Auto-retry logic for quota/rate limits
+        max_retries = 3
+        success = False
+        
+        for attempt in range(max_retries):
+            try:
+                res = requests.post(url, json=payload, timeout=30)
+                data = res.json()
+                
+                if res.status_code == 200 and "candidates" in data:
+                    reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    message_placeholder.markdown(reply)
+                    st.session_state.messages.append({"role": "assistant", "content": reply})
+                    success = True
+                    break
+                elif res.status_code == 429:
+                    message_placeholder.markdown("⏳ *Server busy, retrying in 5 seconds...*")
+                    time.sleep(5)
+                else:
+                    err = data.get("error", {}).get("message", "API request failed.")
+                    message_placeholder.error(f"Error: {err}")
+                    break
+            except Exception as ex:
+                message_placeholder.error(f"Connection issue: {ex}")
+                break
+        
+        if not success and res.status_code == 429:
+            message_placeholder.warning("⚠️ High server load. Please wait 10 seconds and try again.")
