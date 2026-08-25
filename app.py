@@ -56,14 +56,13 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# 6. User Input & Endless Conversation Loop
+# 6. User Input & Request Handling
 if prompt := st.chat_input("Type your algebra problem, step, or question here..."):
-    # Append & display student input
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
 
-    # Sliding context window: send last 20 turns to guarantee unlimited chatting without hitting memory caps
+    # Sliding context window: send last 20 turns
     recent_messages = st.session_state.messages[-20:]
     contents_payload = []
     for m in recent_messages:
@@ -77,7 +76,8 @@ if prompt := st.chat_input("Type your algebra problem, step, or question here...
         message_placeholder = st.empty()
         message_placeholder.markdown("⏳ *Thinking...*")
         
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        # Updated to gemini-3.6-flash
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
         payload = {
             "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": contents_payload,
