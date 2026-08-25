@@ -76,8 +76,8 @@ if prompt := st.chat_input("Type your algebra problem, step, or question here...
         message_placeholder = st.empty()
         message_placeholder.markdown("⏳ *Thinking...*")
         
-        # Standard verified model endpoint
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+        # Endpoint strictly set to gemini-3.6-flash
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
         payload = {
             "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": contents_payload,
