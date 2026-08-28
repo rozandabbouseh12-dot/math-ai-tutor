@@ -94,7 +94,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # شريط التقدم نحو الهدف التالي
+    # شريط التقدم
     progress_val = min(st.session_state.score / 60.0, 1.0)
     st.progress(progress_val)
     
@@ -141,7 +141,7 @@ if not api_key:
     st.error("⚠️ GEMINI_API_KEY is missing in Streamlit Settings > Secrets!")
     st.stop()
 
-# 7. موجه التدريس السقراطي مع تاج التحقق [CORRECT]
+# 7. موجه التدريس السقراطي المباشر
 SYSTEM_PROMPT = """
 You are an expert Cambridge Stage 8 / Grade 7 Mathematics Coach for Algebra.
 
@@ -191,11 +191,11 @@ if user_input:
         message_placeholder = st.empty()
         message_placeholder.markdown("⏳ *Analyzing equation...*")
         
-        # قائمة النماذج الفعالة والمعتمدة حصراً
+        # النماذج الحديثة المعتمدة والنشطة حالياً
         models_to_try = [
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-pro"
+            "gemini-3.6-flash-lite",
+            "gemini-3.6-flash",
+            "gemini-3.1-pro-preview"
         ]
         
         payload = {
@@ -216,7 +216,6 @@ if user_input:
                 if res.status_code == 200 and "candidates" in data:
                     reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                     
-                    # التحقق من الحل الصحيح وتحديث النقاط
                     if "[CORRECT]" in reply:
                         st.session_state.score += 10
                         st.session_state.problems_solved += 1
