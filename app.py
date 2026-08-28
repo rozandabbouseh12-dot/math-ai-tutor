@@ -1,67 +1,183 @@
 import streamlit as st
 import requests
 
-# 1. Page Config
+# 1. إعداد الصفحة
 st.set_page_config(
-    page_title="Cambridge Stage 7 AI Math Coach",
+    page_title="Cambridge Stage 8 AI Math Coach",
     page_icon="📐",
-    layout="centered"
+    layout="centered",
+    initial_sidebar_state="expanded"
 )
 
-st.title("📐 Cambridge Stage 7 AI Math Coach")
-st.caption("Adaptive Learning Environment - Algebra: Expressions and Equations")
+# 2. تصميم CSS عصري وفاخر مع بطاقات التلعيب
+st.markdown("""
+<style>
+    .stApp {
+        background: linear-gradient(145deg, #f4f7fc 0%, #e9eef7 100%);
+    }
+    .hero-container {
+        background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+        color: white;
+        padding: 22px;
+        border-radius: 18px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    .hero-title {
+        font-size: 24px;
+        font-weight: 800;
+        color: #ffffff !important;
+        margin-bottom: 4px;
+    }
+    .hero-sub {
+        font-size: 13px;
+        color: #a0c4ff;
+        margin-bottom: 10px;
+    }
+    .badge-pill {
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: #e2eafc;
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        display: inline-block;
+        margin: 2px 4px;
+    }
+    .score-card {
+        background: white;
+        padding: 14px;
+        border-radius: 12px;
+        border-left: 5px solid #ffb703;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        margin-bottom: 15px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Controls
+# 3. الهيدر الترحيبي
+st.markdown("""
+<div class="hero-container">
+    <div class="hero-title">📐 Cambridge Stage 8 • AI Math Coach</div>
+    <div class="hero-sub">Socratic Adaptive Tutoring • Algebra & Linear Equations</div>
+    <div>
+        <span class="badge-pill">⚖️ Balancing</span>
+        <span class="badge-pill">🔄 Inverse Operations</span>
+        <span class="badge-pill">📦 Expanding Brackets</span>
+        <span class="badge-pill">🏆 Gamified Learning</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# 4. تهيئة متغيرات التلعيب (Gamification State)
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "problems_solved" not in st.session_state:
+    st.session_state.problems_solved = 0
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "👋 **Hello! I am your Cambridge Stage 8 Math Coach.**\n\nWhat algebraic equation or expression are we exploring today?"}
+    ]
+
+# 5. الشريط الجانبي: لوحة المتصدرين والأوسمة
 with st.sidebar:
-    st.header("⚙️ Controls")
-    if st.button("🔄 Start New Problem / Clear Chat"):
+    st.image("https://img.icons8.com/isometric/200/trophy.png", width=80)
+    st.header("🏆 Student Progress")
+    
+    # بطاقة النقاط ومستوى التقدم
+    st.markdown(f"""
+    <div class="score-card">
+        <h4 style="margin:0; color:#023047;">⭐ Total Score: <b>{st.session_state.score} pts</b></h4>
+        <p style="margin:4px 0 0 0; font-size:13px; color:#555;">✅ Solved: <b>{st.session_state.problems_solved} equations</b></p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # شريط التقدم نحو الهدف التالي
+    progress_val = min(st.session_state.score / 60.0, 1.0)
+    st.progress(progress_val)
+    
+    st.markdown("### 🎖️ Badges Earned:")
+    if st.session_state.problems_solved >= 1:
+        st.success("🥉 **Algebra Apprentice** (Solved 1st problem)")
+    else:
+        st.caption("🔒 *Algebra Apprentice (Solve 1 problem)*")
+
+    if st.session_state.score >= 30:
+        st.success("🥈 **Equation Solver** (Earned 30+ pts)")
+    else:
+        st.caption("🔒 *Equation Solver (Earn 30 pts)*")
+
+    if st.session_state.score >= 60:
+        st.success("🥇 **Master of Stage 8** (Earned 60+ pts)")
+    else:
+        st.caption("🔒 *Master of Stage 8 (Earn 60 pts)*")
+
+    st.markdown("---")
+    
+    # إعادة تعيين الجلسة
+    if st.button("🔄 Reset / Start New Problem", use_container_width=True):
         st.session_state.messages = [
-            {"role": "assistant", "content": "Hello! I am your Cambridge Stage 7 Math Coach. What algebra problem are we working on today?"}
+            {"role": "assistant", "content": "👋 **Ready for a new challenge!** Type your next algebra problem below."}
         ]
         st.rerun()
 
-# 2. Get API Key
-api_key = st.secrets.get("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
+    # زر تصدير السجل للأطروحة
+    if len(st.session_state.messages) > 1:
+        transcript = f"STUDENT SCORE: {st.session_state.score} pts | SOLVED: {st.session_state.problems_solved}\n\n"
+        transcript += "\n\n".join([f"[{m['role'].upper()}]: {m['content']}" for m in st.session_state.messages])
+        st.download_button(
+            label="📥 Export Chat Log (Research Data)",
+            data=transcript,
+            file_name="student_math_session.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
 
+# 6. قراءة مفتاح الـ API
+api_key = st.secrets.get("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
 if not api_key:
     st.error("⚠️ GEMINI_API_KEY is missing in Streamlit Settings > Secrets!")
     st.stop()
 
-# 3. System Prompt
+# 7. موجه التدريس السقراطي مع تاج التحقق [CORRECT]
 SYSTEM_PROMPT = """
-You are an expert Cambridge Stage 7 Mathematics Tutor specializing in Algebra (Expressions and Equations).
+You are an expert Cambridge Stage 8 / Grade 7 Mathematics Coach for Algebra.
 
-CORE BEHAVIOR RULES:
-1. PHASE 1 (GUIDED INQUIRY):
-   - When a student presents a problem or partial step, guide them with ONE clear, encouraging hint or Socratic question.
-   - Prompt them to identify: inverse operations, balancing both sides, collecting like terms, or expanding brackets.
-   - Use clean, standard text formatting for math (e.g., 2x + 5 = 15). Avoid awkward symbols.
-
-2. PHASE 2 (SCAFFOLDED SOLUTION):
-   - If the student explicitly asks for the answer ("give me the steps", "I don't know", "show solution") or gets stuck repeatedly:
-     Provide a clear, complete, step-by-step algebraic explanation with the final answer stated plainly.
-   - If the student solves correctly: Validate enthusiastically and confirm the final answer!
-
-3. Keep explanations clear, supportive, and perfectly aligned with Cambridge Stage 7 standards.
+CORE RULES:
+1. Be extremely concise. Output ONLY ONE direct, encouraging Socratic question guiding the student to the next step.
+2. If the student answers or solves correctly, start your response with the exact tag: [CORRECT] followed by an encouraging confirmation.
+   Example: "[CORRECT] Spot on! That is correct. Ready for the next problem?"
+3. If the student makes an error, gently guide them with one question about the inverse operation or balancing.
+4. If the student asks for steps, give only a 3-line calculation breakdown.
 """
 
-# 4. History
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Hello! I am your Cambridge Stage 7 Math Coach. What algebra problem are we working on today?"}
-    ]
+# 8. شريط المسائل السريعة
+st.write("**⚡ Quick Practice (Click to test):**")
+c1, c2, c3 = st.columns(3)
+preset_clicked = None
+if c1.button("📌 2x + 7 = 19", use_container_width=True):
+    preset_clicked = "2x + 7 = 19"
+if c2.button("📌 3(x - 4) = 15", use_container_width=True):
+    preset_clicked = "3(x - 4) = 15"
+if c3.button("📌 5x - 8 = 2x + 7", use_container_width=True):
+    preset_clicked = "5x - 8 = 2x + 7"
 
+# 9. عرض المحادثة
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+        st.markdown(msg["content"])
 
-# 5. User Input
-if prompt := st.chat_input("Type your algebra problem, step, or question here..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# 10. معالجة الإدخال والتوليد
+typed_prompt = st.chat_input("Type your algebra problem or step here...")
+user_input = typed_prompt if typed_prompt else preset_clicked
+
+if user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
-        st.write(prompt)
+        st.markdown(user_input)
 
-    # Use last 4 messages to optimize context
     recent_messages = st.session_state.messages[-4:]
     contents_payload = []
     for m in recent_messages:
@@ -73,30 +189,49 @@ if prompt := st.chat_input("Type your algebra problem, step, or question here...
 
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
-        message_placeholder.markdown("⏳ *Thinking...*")
+        message_placeholder.markdown("⏳ *Analyzing equation...*")
         
-        # Using the exact recommended model: gemini-3.6-flash
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+        # قائمة النماذج الفعالة
+        models_to_try = [
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-1.5-flash"
+        ]
         
         payload = {
             "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": contents_payload,
-            "generationConfig": {
-                "temperature": 0.2,
-                "maxOutputTokens": 800
-            }
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 200}
         }
 
-        try:
-            res = requests.post(url, json=payload, timeout=25)
-            data = res.json()
-            
-            if res.status_code == 200 and "candidates" in data:
-                reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                message_placeholder.markdown(reply)
-                st.session_state.messages.append({"role": "assistant", "content": reply})
-            else:
-                err_msg = data.get("error", {}).get("message", f"HTTP Error {res.status_code}")
-                message_placeholder.error(f"⚠️ Google API Message: {err_msg}")
-        except Exception as e:
-            message_placeholder.error(f"⚠️ Connection Error: {e}")
+        success = False
+        last_error = ""
+
+        for model_name in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            try:
+                res = requests.post(url, json=payload, timeout=20)
+                data = res.json()
+                
+                if res.status_code == 200 and "candidates" in data:
+                    reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    
+                    # التحقق من الحل الصحيح وتحديث النقاط
+                    if "[CORRECT]" in reply:
+                        st.session_state.score += 10
+                        st.session_state.problems_solved += 1
+                        st.balloons()
+                        reply = reply.replace("[CORRECT]", "🎉 ").strip()
+                    
+                    message_placeholder.markdown(reply)
+                    st.session_state.messages.append({"role": "assistant", "content": reply})
+                    success = True
+                    break
+                else:
+                    last_error = data.get("error", {}).get("message", f"HTTP {res.status_code}")
+            except Exception as e:
+                last_error = str(e)
+                continue
+
+        if not success:
+            message_placeholder.error(f"⚠️ Service busy: {last_error}. Please send again.")
