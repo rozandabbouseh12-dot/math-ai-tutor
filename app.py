@@ -191,11 +191,11 @@ if user_input:
         message_placeholder = st.empty()
         message_placeholder.markdown("⏳ *Analyzing equation...*")
         
-        # قائمة النماذج الفعالة
+        # قائمة النماذج الفعالة والمعتمدة حصراً
         models_to_try = [
             "gemini-2.5-flash",
             "gemini-2.5-flash-lite",
-            "gemini-1.5-flash"
+            "gemini-2.5-pro"
         ]
         
         payload = {
